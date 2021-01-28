@@ -1,80 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: Benjamin Cohen-Lhyver
-# @Date:   2021-01-28 10:47:35
+# @Date:   2021-01-28 10:55:26
 # @Last Modified by:   Benjamin Cohen-Lhyver
-# @Last Modified time: 2021-01-28 10:49:56
-
-"""
-SOURCE :
-https://www.pyimagesearch.com/2020/03/02/anomaly-detection-with-keras-tensorflow-and-deep-learning/
-"""
-
-# import the necessary packages
-from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import Conv2DTranspose
-from tensorflow.keras.layers import LeakyReLU
-from tensorflow.keras.layers import Activation
-from tensorflow.keras.layers import Flatten
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Reshape
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Model
-from tensorflow.keras import backend as K
-import numpy as np
-
-
-
-class ConvAutoencoder:
-
-    @staticmethod
-    def build(width, height, depth, filters=(32, 64), latentDim=16):
-        # initialize the input shape to be "channels last" along with
-        # the channels dimension itself
-        # channels dimension itself
-        inputShape = (height, width, depth)
-        chanDim = -1
-        # define the input to the encoder
-        inputs = Input(shape=inputShape)
-        x = inputs
-        # loop over the number of filters
-        for f in filters:
-            # apply a CONV => RELU => BN operation
-            x = Conv2D(f, (3, 3), strides=2, padding="same")(x)
-            x = LeakyReLU(alpha=0.2)(x)
-            x = BatchNormalization(axis=chanDim)(x)
-        # flatten the network and then construct our latent vector
-        volumeSize = K.int_shape(x)
-        x = Flatten()(x)
-        latent = Dense(latentDim)(x)
-        # build the encoder model
-        encoder = Model(inputs, latent, name="encoder")
-
-        # start building the decoder model which will accept the
-        # output of the encoder as its inputs
-        latentInputs = Input(shape=(latentDim,))
-        x = Dense(np.prod(volumeSize[1:]))(latentInputs)
-        x = Reshape((volumeSize[1], volumeSize[2], volumeSize[3]))(x)
-        # loop over our number of filters again, but this time in
-        # reverse order
-        for f in filters[::-1]:
-            # apply a CONV_TRANSPOSE => RELU => BN operation
-            x = Conv2DTranspose(f, (3, 3), strides=2,
-                padding="same")(x)
-            x = LeakyReLU(alpha=0.2)(x)
-            x = BatchNormalization(axis=chanDim)(x)
-        # apply a single CONV_TRANSPOSE layer used to recover the
-        # original depth of the image
-        x = Conv2DTranspose(depth, (3, 3), padding="same")(x)
-        outputs = Activation("sigmoid")(x)
-        # build the decoder model
-        decoder = Model(latentInputs, outputs, name="decoder")
-        # our autoencoder is the encoder + decoder
-        autoencoder = Model(inputs, decoder(encoder(inputs)),
-            name="autoencoder")
-        # return a 3-tuple of the encoder, decoder, and autoencoder
-        return (encoder, decoder, autoencoder)
-
+# @Last Modified time: 2021-01-28 10:58:04
 
 
 # set the matplotlib backend so figures can be saved in the background
@@ -140,6 +68,9 @@ def visualize_predictions(decoded, gt, samples=10):
     return outputs
 
 
+
+
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-d", "--dataset", type=str, required=True,
@@ -158,37 +89,47 @@ args = vars(ap.parse_args())
 EPOCHS = 20
 INIT_LR = 1e-3
 BS = 32
+
 # load the MNIST dataset
 print("[INFO] loading MNIST dataset...")
 ((trainX, trainY), (testX, testY)) = mnist.load_data()
+
 # build our unsupervised dataset of images with a small amount of
 # contamination (i.e., anomalies) added into it
 print("[INFO] creating unsupervised dataset...")
 images = build_unsupervised_dataset(trainX, trainY, validLabel=1,
     anomalyLabel=3, contam=0.01)
+
 # add a channel dimension to every image in the dataset, then scale
 # the pixel intensities to the range [0, 1]
 images = np.expand_dims(images, axis=-1)
 images = images.astype("float32") / 255.0
+
 # construct the training and testing split
 (trainX, testX) = train_test_split(images, test_size=0.2,
     random_state=42)
 
-    # construct our convolutional autoencoder
+# construct our convolutional autoencoder
 print("[INFO] building autoencoder...")
 (encoder, decoder, autoencoder) = ConvAutoencoder.build(28, 28, 1)
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 autoencoder.compile(loss="mse", optimizer=opt)
+
+
 # train the convolutional autoencoder
 H = autoencoder.fit(
     trainX, trainX,
     validation_data=(testX, testX),
     epochs=EPOCHS,
     batch_size=BS)
+
+
 # use the convolutional autoencoder to make predictions on the
 # testing images, construct the visualization, and then save it
 # to disk
 print("[INFO] making predictions...")
+
+
 decoded = autoencoder.predict(testX)
 vis = visualize_predictions(decoded, testX)
 cv2.imwrite(args["vis"], vis)
@@ -213,3 +154,12 @@ f.close()
 # serialize the autoencoder model to disk
 print("[INFO] saving autoencoder...")
 autoencoder.save(args["model"], save_format="h5")
+
+
+
+
+#######################################################################################################################
+
+                                         # === END OF FILE === #
+
+#######################################################################################################################
