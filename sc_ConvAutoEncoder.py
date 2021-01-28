@@ -1,4 +1,13 @@
+# -*- coding: utf-8 -*-
+# @Author: Benjamin Cohen-Lhyver
+# @Date:   2021-01-28 10:47:35
+# @Last Modified by:   Benjamin Cohen-Lhyver
+# @Last Modified time: 2021-01-28 10:49:56
 
+"""
+SOURCE :
+https://www.pyimagesearch.com/2020/03/02/anomaly-detection-with-keras-tensorflow-and-deep-learning/
+"""
 
 # import the necessary packages
 from tensorflow.keras.layers import BatchNormalization
