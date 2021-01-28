@@ -2,14 +2,14 @@
 # @Author: Benjamin Cohen-Lhyver
 # @Date:   2021-01-28 10:55:26
 # @Last Modified by:   Benjamin Cohen-Lhyver
-# @Last Modified time: 2021-01-28 10:58:04
+# @Last Modified time: 2021-01-28 12:27:33
 
 
 # set the matplotlib backend so figures can be saved in the background
 import matplotlib
 matplotlib.use("Agg")
 # import the necessary packages
-from pyimagesearch.convautoencoder import ConvAutoencoder
+from convautoencoder import ConvAutoencoder
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.datasets import mnist
 from sklearn.model_selection import train_test_split
@@ -19,28 +19,33 @@ import argparse
 import random
 import pickle
 import cv2
+import copy as cp
 
-
-def build_unsupervised_dataset(data, labels, validLabel=1,
-    anomalyLabel=3, contam=0.01, seed=42):
+def build_unsupervised_dataset(
+    data,
+    labels,
+    valid_label=1,
+    anomaly_label=3,
+    contam=0.01,
+    seed=42):
     # grab all indexes of the supplied class label that are *truly*
     # that particular label, then grab the indexes of the image
     # labels that will serve as our "anomalies"
-    validIdxs = np.where(labels == validLabel)[0]
-    anomalyIdxs = np.where(labels == anomalyLabel)[0]
+    valid_indexes = np.where(labels == valid_label)[0]
+    anomaly_indexes = np.where(labels == anomaly_label)[0]
     # randomly shuffle both sets of indexes
-    random.shuffle(validIdxs)
-    random.shuffle(anomalyIdxs)
+    random.shuffle(valid_indexes)
+    random.shuffle(anomaly_indexes)
     # compute the total number of anomaly data points to select
-    i = int(len(validIdxs) * contam)
-    anomalyIdxs = anomalyIdxs[:i]
+    i = int(len(valid_indexes) * contam)
+    anomaly_indexes = anomaly_indexes[:i]
     # use NumPy array indexing to extract both the valid images and
-    # "anomlay" images
-    validImages = data[validIdxs]
-    anomalyImages = data[anomalyIdxs]
+    # "anomaly" images
+    valid_images = data[valid_indexes]
+    anomaly_images = data[anomaly_indexes]
     # stack the valid images and anomaly images together to form a
     # single data matrix and then shuffle the rows
-    images = np.vstack([validImages, anomalyImages])
+    images = np.vstack([valid_images, anomaly_images])
     np.random.seed(seed)
     np.random.shuffle(images)
     # return the set of images
@@ -72,23 +77,31 @@ def visualize_predictions(decoded, gt, samples=10):
 
 
 # construct the argument parse and parse the arguments
-ap = argparse.ArgumentParser()
-ap.add_argument("-d", "--dataset", type=str, required=True,
-    help="path to output dataset file")
-ap.add_argument("-m", "--model", type=str, required=True,
-    help="path to output trained autoencoder")
-ap.add_argument("-v", "--vis", type=str, default="recon_vis.png",
-    help="path to output reconstruction visualization file")
-ap.add_argument("-p", "--plot", type=str, default="plot.png",
-    help="path to output plot file")
-args = vars(ap.parse_args())
+# ap = argparse.ArgumentParser()
+# ap.add_argument("-d", "--dataset", type=str, required=True,
+#     help="path to output dataset file")
+# ap.add_argument("-m", "--model", type=str, required=True,
+#     help="path to output trained autoencoder")
+# ap.add_argument("-v", "--vis", type=str, default="recon_vis.png",
+#     help="path to output reconstruction visualization file")
+# ap.add_argument("-p", "--plot", type=str, default="plot.png",
+#     help="path to output plot file")
+# args = vars(ap.parse_args())
+
+
+args = {
+    "model": "autoencoder.model",
+    "dataset": "images.pickle",
+    "vis": "recon_vis.png",
+    "plot": "plot.png"
+}
 
 
 # initialize the number of epochs to train for, initial learning rate,
 # and batch size
 EPOCHS = 20
 INIT_LR = 1e-3
-BS = 32
+BATCH_SIZE = 32
 
 # load the MNIST dataset
 print("[INFO] loading MNIST dataset...")
@@ -97,8 +110,14 @@ print("[INFO] loading MNIST dataset...")
 # build our unsupervised dataset of images with a small amount of
 # contamination (i.e., anomalies) added into it
 print("[INFO] creating unsupervised dataset...")
-images = build_unsupervised_dataset(trainX, trainY, validLabel=1,
-    anomalyLabel=3, contam=0.01)
+# images = build_unsupervised_dataset(trainX, trainY, valid_label=1,
+#     anomaly_label=3, contam=0.05)
+# images = np.where(trainY == 1)[0]
+images = trainX[np.where(trainY == 1)[0]]
+
+#  A TERMINER #
+# images = "/Users/bcl/Data/Datasets/zipper/train/good"
+#  A TERMINER #
 
 # add a channel dimension to every image in the dataset, then scale
 # the pixel intensities to the range [0, 1]
@@ -121,14 +140,13 @@ H = autoencoder.fit(
     trainX, trainX,
     validation_data=(testX, testX),
     epochs=EPOCHS,
-    batch_size=BS)
+    batch_size=BATCH_SIZE)
 
 
 # use the convolutional autoencoder to make predictions on the
 # testing images, construct the visualization, and then save it
 # to disk
 print("[INFO] making predictions...")
-
 
 decoded = autoencoder.predict(testX)
 vis = visualize_predictions(decoded, testX)
@@ -146,15 +164,17 @@ plt.xlabel("Epoch #")
 plt.ylabel("Loss")
 plt.legend(loc="lower left")
 plt.savefig(args["plot"])
+
 # serialize the image data to disk
 print("[INFO] saving image data...")
+
 f = open(args["dataset"], "wb")
 f.write(pickle.dumps(images))
 f.close()
+
 # serialize the autoencoder model to disk
 print("[INFO] saving autoencoder...")
 autoencoder.save(args["model"], save_format="h5")
-
 
 
 
