@@ -2,7 +2,7 @@
 # @Author: Benjamin Cohen-Lhyver
 # @Date:   2021-01-28 10:56:25
 # @Last Modified by:   Benjamin Cohen-Lhyver
-# @Last Modified time: 2021-01-28 12:33:26
+# @Last Modified time: 2021-01-28 12:44:38
 
 # import the necessary packages
 from tensorflow.keras.models import load_model
@@ -47,10 +47,6 @@ baseline_images = np.expand_dims(baseline_images, axis=-1)
 baseline_images = baseline_images.astype("float32") / 255.0
 
 
-images_to_analyse = trainX[np.where(trainY == 3)[0]]
-images_to_analyse = images_to_analyse[:100]
-images_to_analyse = np.vstack([trainX[np.where(trainY == 1)[0]], images_to_analyse])
-
 # make predictions on our image data and initialize our list of
 # reconstruction errors
 decoded = autoencoder.predict(baseline_images)
@@ -74,6 +70,49 @@ print("[INFO] mse threshold: {}".format(thresh))
 print("[INFO] {} outliers found".format(len(idxs)))
 
 
+# =======
+
+images_to_analyse = trainX[np.where(trainY == 3)[0]]
+images_to_analyse = images_to_analyse[:100]
+images_to_analyse = np.expand_dims(images_to_analyse, axis=-1)
+images_to_analyse = images_to_analyse.astype("float32") / 255.0
+
+
+decoded = autoencoder.predict(images_to_analyse)
+
+# loop over all original images and their corresponding
+# reconstructions
+errors = []
+for (image, reconstructed) in zip(images_to_analyse, decoded):
+    # compute the mean squared error between the ground-truth image
+    # and the reconstructed image, then add it to our list of errors
+    mse = np.mean((image - reconstructed) ** 2)
+    errors.append(mse)
+
+# ======
+
+images_to_analyse = trainX[np.where(trainY == 3)[0]]
+images_to_analyse = images_to_analyse[:100]
+images_to_analyse = np.vstack([images_to_analyse, trainX[np.where(trainY == 1)[0]][:100]])
+images_to_analyse = np.expand_dims(images_to_analyse, axis=-1)
+images_to_analyse = images_to_analyse.astype("float32") / 255.0
+
+
+decoded = autoencoder.predict(images_to_analyse)
+
+# loop over all original images and their corresponding
+# reconstructions
+errors = []
+for (image, reconstructed) in zip(images_to_analyse, decoded):
+    # compute the mean squared error between the ground-truth image
+    # and the reconstructed image, then add it to our list of errors
+    mse = np.mean((image - reconstructed) ** 2)
+    errors.append(mse)
+
+
+
+idxs = np.where(np.array(errors) >= thresh)[0]
+
 # initialize the outputs array
 outputs = None
 random_idxs = np.random.randint(0, len(idxs), np.min([len(idxs), 20]))
@@ -81,7 +120,7 @@ random_idxs = np.random.randint(0, len(idxs), np.min([len(idxs), 20]))
 # for i in idxs[50:60]:
 for i in random_idxs:
     # grab the original image and reconstructed image
-    original = (images[i] * 255).astype("uint8")
+    original = (images_to_analyse[i] * 255).astype("uint8")
     reconstructed = (decoded[i] * 255).astype("uint8")
     # stack the original and reconstructed image side-by-side
     output = np.hstack([original, reconstructed])
